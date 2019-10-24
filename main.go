@@ -6,16 +6,39 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 )
 
 //TODO: Error handler
 
-func main() {
+type Conf struct {
+	Login     string
+	Pass      string
+	DBName    string
+	TableName string
+}
 
+var conf Conf
+
+func init() {
+	// loads values from .env into the system
+	if err := godotenv.Load(); err != nil {
+		log.Print("No .env file found")
+		os.Exit(1)
+	}
+	conf = Conf{
+		Login:     os.Getenv("DB_LOGIN"),
+		Pass:      os.Getenv("DB_PASSWORD"),
+		DBName:    os.Getenv("DB_NAME"),
+		TableName: os.Getenv("TABLE_NAME")}
+}
+
+func main() {
 	http.HandleFunc("/", WaterRouterHandler)
 	http.HandleFunc("/favicon.ico", Favicon)
 	err := http.ListenAndServe(":9001", nil)
@@ -25,7 +48,7 @@ func main() {
 }
 
 func WaterRouterHandler(w http.ResponseWriter, r *http.Request) {
-	db, err := sqlx.Connect("mysql", "root:root@tcp(localhost:3306)/w_meter")
+	db, err := sqlx.Connect("mysql", conf.Login+":"+conf.Pass+"@tcp(localhost:3306)/"+conf.DBName)
 	if db == nil {
 		panic("DB in nil")
 	}
@@ -92,7 +115,7 @@ func WaterRouterHandler(w http.ResponseWriter, r *http.Request) {
 
 	tm := time.Unix(int64(params.Date), 0)
 
-	sql, err := db.Exec("insert into meters_data (MeterId, WCold1, WCold2, WHot1, WHot2, Power, Date) values (?,?,?,?,?,?,?)",
+	sql, err := db.Exec("insert into "+conf.TableName+" (MeterId, WCold1, WCold2, WHot1, WHot2, Power, Date) values (?,?,?,?,?,?,?)",
 		params.Id, params.WCold1, params.WCold2, params.WHot1, params.WHot2, params.Power, tm)
 	if err != nil {
 		fmt.Println(err)
