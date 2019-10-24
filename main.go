@@ -2,7 +2,10 @@ package main
 
 import (
 	"WaterMeterApi/models"
+	"encoding/json"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	"log"
 	"net/http"
 	"strconv"
@@ -11,14 +14,33 @@ import (
 
 //TODO: Error handler
 
+func main() {
+
+	http.HandleFunc("/", WaterRouterHandler)
+	http.HandleFunc("/favicon.ico", Favicon)
+	err := http.ListenAndServe(":9001", nil)
+	if err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
+}
+
 func WaterRouterHandler(w http.ResponseWriter, r *http.Request) {
+	db, err := sqlx.Connect("mysql", "root:root@tcp(localhost:3306)/w_meter")
+	if db == nil {
+		panic("DB in nil")
+	}
+	fmt.Println("DB - OK!")
+
 	params := new(models.WaterParams)
-	err := r.ParseForm()
+	err = r.ParseForm()
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(r.Form)
 	params.Id = r.FormValue("id")
+	if params.Id == "" {
+		fmt.Println("Error: empty ID")
+		return
+	}
 
 	cval1, err := strconv.ParseInt(r.FormValue("cval1"), 10, 64)
 	if err != nil {
@@ -51,17 +73,35 @@ func WaterRouterHandler(w http.ResponseWriter, r *http.Request) {
 	if !valid {
 		fmt.Println(comment)
 	}
-	fmt.Println(params)
-	a, err := fmt.Fprintf(w, "Version: %s", "0.2")
+
+	js, err := json.Marshal(params)
+
 	if err != nil {
-		fmt.Println("Error: ", a)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	a, err := w.Write(js)
+
+	if err != nil {
+		fmt.Println("Error: 12: %w", a)
+	}
+	fmt.Print("New request: ")
+	fmt.Println(string(js))
+
+	tm := time.Unix(int64(params.Date), 0)
+
+	sql, err := db.Exec("insert into meters_data (MeterId, WCold1, WCold2, WHot1, WHot2, Power, Date) values (?,?,?,?,?,?,?)",
+		params.Id, params.WCold1, params.WCold2, params.WHot1, params.WHot2, params.Power, tm)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	in, err := sql.LastInsertId()
+	fmt.Println("New record id:", in)
 }
 
-func main() {
-	http.HandleFunc("/", WaterRouterHandler)
-	err := http.ListenAndServe(":9000", nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
+func Favicon(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
 }
