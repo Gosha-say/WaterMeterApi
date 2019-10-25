@@ -26,7 +26,6 @@ type Conf struct {
 var conf Conf
 
 func init() {
-	// loads values from .env into the system
 	if err := godotenv.Load(); err != nil {
 		log.Print("No .env file found")
 		os.Exit(1)
@@ -40,7 +39,9 @@ func init() {
 
 func main() {
 	http.HandleFunc("/", WaterRouterHandler)
-	http.HandleFunc("/favicon.ico", Favicon)
+	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
 	err := http.ListenAndServe(":9001", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
@@ -123,8 +124,4 @@ func WaterRouterHandler(w http.ResponseWriter, r *http.Request) {
 
 	in, err := sql.LastInsertId()
 	fmt.Println("New record id:", in)
-}
-
-func Favicon(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
 }
