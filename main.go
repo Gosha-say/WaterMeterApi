@@ -125,3 +125,5 @@ func WaterRouterHandler(w http.ResponseWriter, r *http.Request) {
 	in, err := sql.LastInsertId()
 	fmt.Println("New record id:", in)
 }
+
+//GOOS=windows GOARCH=amd64 go build -o main.exe main.go
